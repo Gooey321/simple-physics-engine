@@ -1,6 +1,6 @@
 # Physics Engine
 
-A custom physics engine for simulating basic physical interactions between objects.
+A custom *slightly buggy* physics engine built from scratch for simulating basic physical interactions between objects. Like making a platformer game
 
 ## Features
 
@@ -8,6 +8,7 @@ A custom physics engine for simulating basic physical interactions between objec
 - Gravity and friction simulation
 - Player control with keyboard input
 - Simple rendering of objects on a canvas
+- Adding rectangles of various sizes to the canvas 
 
 ## Getting Started
 
