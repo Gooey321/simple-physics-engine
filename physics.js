@@ -32,7 +32,7 @@ document.addEventListener("DOMContentLoaded", function() {
     });
 
     // Set gravity variable
-    let gravity = 0.2;
+    let gravity = 0.3;
 
     // Set friction variable
     let friction = 0.1;
@@ -53,6 +53,8 @@ document.addEventListener("DOMContentLoaded", function() {
     let PhysicalObject = function(x, y, w, h, mass, isStatic, isPlayer) {
         this.x = x;
         this.y = y;
+        this.prevX = x;
+        this.prevY = y;
         this.width = w;
         this.height = h;
         this.mass = mass;
@@ -61,42 +63,50 @@ document.addEventListener("DOMContentLoaded", function() {
         this.canJump = false;
         this.isOnGround = false;
 
-        this.vx = 0; // Velocity in X
-        this.vy = 0; // Velocity in Y
+        this.ax = 0;
+        this.ay = 0; 
+        this.vx = 0; 
+        this.vy = 0; 
 
         // Apply force to the object
         this.applyForce = function(fx, fy) {
             if (!this.isStatic) {
-                // Friction force. Friction opposes motion so reverse x velocity
-                let frictionForceX = -this.vx * friction * this.mass;
-                let allFx = fx + frictionForceX;
-                let allFy = fy;
-
-                // Acceleration = Force / Mass (based on newton second law)
-                let ax = allFx / this.mass;
-                let ay = allFy / this.mass;
-                this.vx += ax;
-                this.vy += ay;
+                this.ax += fx / this.mass;
+                this.ay += fy / this.mass;
             }
         };
 
         // Update object's position based on velocity
         this.update = function() {
             if (!this.isStatic) {
-                const airResistance = 0.99;
-
                 this.handleInput();
 
-                // Apply gravity as a force (Weight = mass * gravity)
-                this.applyForce(0, this.mass * gravity);
+                let tempX = this.x;
+                let tempY = this.y;
 
-                // Update position based on velocity
-                this.x += this.vx * airResistance;
-                this.y += this.vy * airResistance;
+                // Calculate current velocities
+                this.vx = this.x - this.prevX;
+                this.vy = this.y - this.prevY;
 
-                const velocityThreshold = 0.01;
-                if (Math.abs(this.vx) < velocityThreshold) this.vx = 0;
-                if (Math.abs(this.vy) < velocityThreshold) this.vy = 0;
+                // Apply gravity as a force
+                this.applyForce(0, gravity);
+
+                if (this.isOnGround) {
+                    let frictionForce = -this.vx * friction;
+                    this.applyForce(frictionForce, 0);
+                }
+            
+                let nextX = 2 * this.x - this.prevX + this.ax;
+                let nextY = 2 * this.y - this.prevY + this.ay;
+
+                this.prevX = this.x;
+                this.prevY = this.y;
+
+                this.x = nextX;
+                this.y = nextY;
+
+                this.ax = 0;
+                this.ay = 0;
             }
         };
 
@@ -111,8 +121,11 @@ document.addEventListener("DOMContentLoaded", function() {
         this.handleInput = function() {
             if (this.isPlayer) {
                 // Move speed
-                const speed = 1.9;
-                const jumpHeight = -10;
+                const groundSpeed = 1.4;
+                const airSpeed = 0.8;
+                const jumpForce = -12;
+
+                const speed = this.isOnGround ? groundSpeed : airSpeed;
 
                 let FforceX = 0;
 
@@ -122,11 +135,16 @@ document.addEventListener("DOMContentLoaded", function() {
                     FforceX = speed;
                 }
 
+                if (!this.isOnGround) {
+                    let airResistance = -this.vx * 0.03;
+                    this.applyForce(airResistance, 0);
+                }
+
                 // Apply friction
                 this.applyForce(FforceX, 0);
 
                 if (keys.ArrowUp && this.canJump) {
-                    this.vy = jumpHeight;
+                    this.applyForce(0, jumpForce);
                     this.canJump = false;
                     this.isOnGround = false;
                 }
@@ -145,14 +163,16 @@ document.addEventListener("DOMContentLoaded", function() {
             obj.update();
 
             // Draw the object    
-            context.fillStyle = obj.isStatic ? "black" : (obj.isPlayer ? "green" : "blue");
+            context.fillStyle = obj.isStatic ? "black" : (obj.isPlayer ? "red" : "blue");
             context.fillRect(obj.x, obj.y, obj.width, obj.height);
         }
 
         physicalObjects.forEach(obj => {
-            if (obj.isPlayer) {
+            if (!obj.isStatic) {
                 obj.isOnGround = false;
-                obj.canJump = false;
+                if (obj.isPlayer) {
+                    obj.canJump = false;
+                }
             }
         })
 
@@ -209,6 +229,17 @@ document.addEventListener("DOMContentLoaded", function() {
             objB.vx = (v2 * -massDifference + 2 * objA.mass * v1) / totalMass;
         } else {
             // Collision on Y axis
+            let objects = [objA, objB];
+            let dynamicObjects = objects.filter(obj => !obj.isStatic);
+
+            dynamicObjects.forEach(obj => {
+                obj.isOnGround = obj.vy >= 0;
+            });
+
+            objects.forEach(obj => {
+                obj.isOnGround = obj.vy >= 0;
+            });
+
             let player, platform;
     
             if (objA.isPlayer) {
@@ -219,39 +250,43 @@ document.addEventListener("DOMContentLoaded", function() {
                 platform = objA;
             }
     
-            if (player && platform) {
-                let playerBottom = player.y + player.height;
-                let platformTop = platform.y;
-                let platformBottom = platform.y + platform.height;
+            if (objA.isPlayer || objB.isPlayer) {
+                // Player-specific collision handling
+                let player = objA.isPlayer ? objA : objB.isPlayer ? objB : null;
+                let platform = objA.isPlayer ? objB : objB.isPlayer ? objA : null;
     
-                const groundTolerance = 0.1;
+                if (player && platform) {
+                    let platformTop = platform.y;
+                    let platformBottom = platform.y + platform.height;
     
-                let playerPrevY = player.y - player.vy;
-                let playerPrevBottom = playerPrevY + player.height;
+                    const groundTolerance = 0.1;
     
-                // Check if collision is from the top
-                if (playerPrevBottom <= platformTop + groundTolerance && player.vy >= 0) {
-                    // Landing on the platform
-                    player.canJump = true;
-                    player.isOnGround = true;
-                    player.vy = 0;
-                    player.y = platformTop - player.height;
+                    let playerPrevY = player.y - player.vy;
+                    let playerPrevBottom = playerPrevY + player.height;
     
-                    if (!platform.isStatic) {
-                        player.vx += platform.vx;
+                    // Check if collision is from the top
+                    if (playerPrevBottom <= platformTop + groundTolerance && player.vy >= 0) {
+                        // Landing on the platform
+                        player.canJump = true;
+                        player.isOnGround = true;
+                        player.vy = 0;
+                        player.y = platformTop - player.height;
+    
+                        if (!platform.isStatic) {
+                            player.vx += platform.vx;
+                        }
+                    } else if (playerPrevY >= platformBottom - groundTolerance && player.vy <= 0) {
+                        // Hitting platform from below
+                        player.vy = 0;
+                        player.y = platform.y + platform.height;
+                        player.isOnGround = false;
+                    } else {
+                        if (player.x + player.width > platform.x && player.vx > 0) {
+                            player.x = platform.x - player.width;
+                        } else if (player.x < platform.x + platform.width && player.vx < 0) {
+                            player.x = platform.x + platform.width;
+                        }
                     }
-                } else if (playerPrevY >= platformBottom - groundTolerance && player.vy <= 0) {
-                    // Hitting platform from below
-                    player.vy = 0;
-                    player.y = platform.y + platform.height;
-                    player.isOnGround = false;
-                } else {
-                    if (player.x + player.width > platform.x && player.vx > 0) {
-                        player.x = platform.x - playerWidth;
-                    } else if (player.x < platform.x + platform.width && player.vx < 0) {
-                        player.x = platform.x + platform.width;
-                    }
-                    
                 }
             } else {
                 // Handle non-player collisions on Y axis
@@ -264,7 +299,7 @@ document.addEventListener("DOMContentLoaded", function() {
                     objB.y += overlapY / 2 * (objA.y < objB.y ? 1 : -1);
                 }
     
-                const bounciness = 0.1;
+                const bounciness = 0;
                 if (!objA.isStatic && !objB.isStatic) {
                     let tempVy = objA.vy;
                     objA.vy = bounciness * (objA.vy * (objA.mass - objB.mass) + 2 * objB.mass * objB.vy) / (objA.mass + objB.mass);
@@ -301,16 +336,32 @@ document.addEventListener("DOMContentLoaded", function() {
     // x, y, w, h, mass, isStatic, isPlayer
 
     // Player
-    physicalObjects.push(new PhysicalObject(100, 0, 30, 30, 2, false, true));
+    physicalObjects.push(new PhysicalObject(50, 0, 30, 30, 2, false, true));
 
 
     physicalObjects.push(new PhysicalObject(125, 0, 20, 20, 1, false, false));
     physicalObjects.push(new PhysicalObject(150, 0, 20, 20, 1, false, false));
     physicalObjects.push(new PhysicalObject(175, 0, 20, 20, 1, false, false));
-    physicalObjects.push(new PhysicalObject(210, 500, 20, 20, 1, false, false));
-    physicalObjects.push(new PhysicalObject(210, 200, 50, 50, 2, false, false));
-    physicalObjects.push(new PhysicalObject(210, 70, 100, 100, 100, false, false));
-    physicalObjects.push(new PhysicalObject(750, height - 4500, 200, 200, 200, false, false));
+
+    physicalObjects.push(new PhysicalObject(145, 20, 20, 20, 1, false, false));
+    physicalObjects.push(new PhysicalObject(170, 20, 20, 20, 1, false, false));
+    physicalObjects.push(new PhysicalObject(195, 20, 20, 20, 1, false, false));
+
+    physicalObjects.push(new PhysicalObject(165, 20, 20, 20, 1, false, false));
+    physicalObjects.push(new PhysicalObject(190, 20, 20, 20, 1, false, false));
+    physicalObjects.push(new PhysicalObject(215, 20, 20, 20, 1, false, false));
+
+    // Stack of rectangles on the right
+    physicalObjects.push(new PhysicalObject(700, 50, 20, 20, 1, false, false));
+    physicalObjects.push(new PhysicalObject(1200, 50, 100, 50, 5, false, false));
+    physicalObjects.push(new PhysicalObject(1205, -50, 90, 50, 5, false, false));
+    physicalObjects.push(new PhysicalObject(1210, -150, 80, 50, 4.5, false, false));
+    physicalObjects.push(new PhysicalObject(1215, -250, 70, 50, 4, false, false));
+    physicalObjects.push(new PhysicalObject(1220, -350, 60, 50, 3.5, false, false));
+    physicalObjects.push(new PhysicalObject(1220, -350, 60, 50, 3.5, false, false));
+
+    physicalObjects.push(new PhysicalObject(210, 70, 50, 50, 2, false, false));
+    physicalObjects.push(new PhysicalObject(750, height - 50, 200, 200, 200, false, false));
 
 
     // Make a floor
