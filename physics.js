@@ -20,6 +20,17 @@ document.addEventListener("DOMContentLoaded", function() {
     // Set friction variable
     let friction = 0.1;
 
+    let rainbowColors = [
+        '#FF0000', // Red
+        '#FF7F00', // Orange
+        '#FFFF00', // Yellow
+        '#00FF00', // Green
+        '#0000FF', // Blue
+        '#4B0082', // Indigo
+        '#9400D3'  // Violet
+    ];
+    let colorIndex = 0;
+
     // Initialise the canvas element and set its width and height
     let canvas = document.createElement("canvas");
         canvas.id = "canvas";
@@ -48,14 +59,16 @@ document.addEventListener("DOMContentLoaded", function() {
             30, // Height
             2,  // Mass
             false, // Not static
+            rainbowColors[colorIndex] // Color
         );
         
         // Add to physics objects
         physicalObjects.push(newCube);
+        colorIndex = (colorIndex + 1) % rainbowColors.length;
     });
 
     // PhysicalObject class
-    let PhysicalObject = function(x, y, w, h, mass, isStatic, isPlayer) {
+    let PhysicalObject = function(x, y, w, h, mass, isStatic, color) {
         this.x = x;
         this.y = y;
         this.prevX = x;
@@ -65,6 +78,7 @@ document.addEventListener("DOMContentLoaded", function() {
         this.mass = mass;
         this.isStatic = isStatic;
         this.isOnGround = false;
+        this.color = color;
 
         this.ax = 0;
         this.ay = 0; 
@@ -132,7 +146,7 @@ document.addEventListener("DOMContentLoaded", function() {
             obj.update();
 
             // Draw the object    
-            context.fillStyle = obj.isStatic ? "black" : "blue";
+            context.fillStyle = obj.isStatic ? "black" : obj.color;
             context.fillRect(obj.x, obj.y, obj.width, obj.height);
         }
 
@@ -253,30 +267,30 @@ document.addEventListener("DOMContentLoaded", function() {
     // Initialize dynamic objects within the viewport
 
     // Stack of squares to the left
-    physicalObjects.push(new PhysicalObject(125, height - 100, 20, 20, 1, false));
-    physicalObjects.push(new PhysicalObject(150, height - 100, 20, 20, 1, false));
-    physicalObjects.push(new PhysicalObject(175, height - 100, 20, 20, 1, false));
-    physicalObjects.push(new PhysicalObject(125, height - 200, 20, 20, 1, false));
-    physicalObjects.push(new PhysicalObject(150, height - 200, 20, 20, 1, false));
-    physicalObjects.push(new PhysicalObject(175, height - 200, 20, 20, 1, false));
-    physicalObjects.push(new PhysicalObject(125, height - 300, 20, 20, 1, false));
-    physicalObjects.push(new PhysicalObject(150, height - 300, 20, 20, 1, false));
-    physicalObjects.push(new PhysicalObject(175, height - 300, 20, 20, 1, false));
+    physicalObjects.push(new PhysicalObject(125, height - 100, 20, 20, 1, false, rainbowColors[0]));
+    physicalObjects.push(new PhysicalObject(150, height - 100, 20, 20, 1, false, rainbowColors[1]));
+    physicalObjects.push(new PhysicalObject(175, height - 100, 20, 20, 1, false, rainbowColors[2]));
+    physicalObjects.push(new PhysicalObject(125, height - 200, 20, 20, 1, false, rainbowColors[3]));
+    physicalObjects.push(new PhysicalObject(150, height - 200, 20, 20, 1, false, rainbowColors[4]));
+    physicalObjects.push(new PhysicalObject(175, height - 200, 20, 20, 1, false, rainbowColors[5]));
+    physicalObjects.push(new PhysicalObject(125, height - 300, 20, 20, 1, false, rainbowColors[6]));
+    physicalObjects.push(new PhysicalObject(150, height - 300, 20, 20, 1, false, rainbowColors[0]));
+    physicalObjects.push(new PhysicalObject(175, height - 300, 20, 20, 1, false, rainbowColors[1]));
 
-    // Stack of rectangles on the right
-    physicalObjects.push(new PhysicalObject(700, height - 150, 20, 20, 1, false));
-    physicalObjects.push(new PhysicalObject(1200, height - 150, 100, 50, 5, false));
-    physicalObjects.push(new PhysicalObject(1205, height - 200, 90, 50, 5, false));
-    physicalObjects.push(new PhysicalObject(1210, height - 250, 80, 50, 4.5, false));
-    physicalObjects.push(new PhysicalObject(1215, height - 300, 70, 50, 4, false));
-    physicalObjects.push(new PhysicalObject(1220, height - 350, 60, 50, 3.5, false));
-    physicalObjects.push(new PhysicalObject(1225, height - 400, 50, 50, 3.5, false));
-    physicalObjects.push(new PhysicalObject(1230, height - 450, 40, 50, 3.5, false));
-    physicalObjects.push(new PhysicalObject(1235, height - 500, 30, 50, 3.5, false));
-    physicalObjects.push(new PhysicalObject(1240, height - 550, 20, 50, 3.5, false));
-    physicalObjects.push(new PhysicalObject(1245, height - 600, 10, 50, 3.5, false));
+    // Stack of rectangles on the right (with colors)
+    physicalObjects.push(new PhysicalObject(700, height - 150, 20, 20, 1, false, rainbowColors[2]));
+    physicalObjects.push(new PhysicalObject(1200, height - 150, 100, 50, 5, false, rainbowColors[3]));
+    physicalObjects.push(new PhysicalObject(1205, height - 200, 90, 50, 5, false, rainbowColors[4]));
+    physicalObjects.push(new PhysicalObject(1210, height - 250, 80, 50, 4.5, false, rainbowColors[5]));
+    physicalObjects.push(new PhysicalObject(1215, height - 300, 70, 50, 4, false, rainbowColors[6]));
+    physicalObjects.push(new PhysicalObject(1220, height - 350, 60, 50, 3.5, false, rainbowColors[0]));
+    physicalObjects.push(new PhysicalObject(1225, height - 400, 50, 50, 3.5, false, rainbowColors[1]));
+    physicalObjects.push(new PhysicalObject(1230, height - 450, 40, 50, 3.5, false, rainbowColors[2]));
+    physicalObjects.push(new PhysicalObject(1235, height - 500, 30, 50, 3.5, false, rainbowColors[3]));
+    physicalObjects.push(new PhysicalObject(1240, height - 550, 20, 50, 3.5, false, rainbowColors[4]));
+    physicalObjects.push(new PhysicalObject(1245, height - 600, 10, 50, 3.5, false, rainbowColors[5]));
 
-    // Platforms
+    // Platforms (static objects remain black)
     physicalObjects.push(new PhysicalObject(0, height - 20, width, 20, 1000, true));
     physicalObjects.push(new PhysicalObject(0, height - 500, 200, 20, 1000, true));
     physicalObjects.push(new PhysicalObject(500, height - 500, 200, 20, 1000, true));
