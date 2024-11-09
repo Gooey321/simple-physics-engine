@@ -3,11 +3,9 @@
 A custom *slightly buggy* physics engine built from scratch for simulating basic physical interactions between objects. Like making a platformer game
 
 ## Features
-### *Warning collisions from underneath 
-
 - Basic collision detection and response
 - Gravity and friction simulation
-- Player control with keyboard input
+- Click to spawn a cube
 - Simple rendering of objects on a canvas
 - Adding rectangles of various sizes to the canvas 
 
