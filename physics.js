@@ -1,5 +1,9 @@
 document.addEventListener("DOMContentLoaded", function() {
-    // Get the width and height of the window
+    document.body.style.margin = '0';
+    document.body.style.padding = '0';
+    document.documentElement.style.margin = '0';
+    document.documentElement.style.padding = '0';
+    
     var win = window,
         d = document,
         e = d.documentElement,
@@ -9,27 +13,6 @@ document.addEventListener("DOMContentLoaded", function() {
         
     // Initialise an array to hold the physical objects
     let physicalObjects = [];
-
-    // Initialise an object to hold the keys
-    let keys = {
-        ArrowLeft: false,
-        ArrowRight: false,
-        ArrowUp: false
-    };
-
-    document.addEventListener("keydown", function(event) {
-        if (keys.hasOwnProperty(event.code)) {
-            keys[event.code] = true;
-            event.preventDefault();
-        }
-    });
-
-    document.addEventListener("keyup", function(event) {
-        if (keys.hasOwnProperty(event.code)) {
-            keys[event.code] = false;
-            event.preventDefault();
-        }
-    });
 
     // Set gravity variable
     let gravity = 0.3;
@@ -42,12 +25,34 @@ document.addEventListener("DOMContentLoaded", function() {
         canvas.id = "canvas";
         canvas.width = width;
         canvas.height = height;
+        canvas.style.border = "1px solid black"; // Added border for visibility
     
     // Append the canvas element to the HTML body
     document.body.appendChild(canvas);
     
     // Get the canvas's context object
     let context = canvas.getContext("2d");
+
+    // Add after canvas initialization but before the game loop:
+    canvas.addEventListener('click', function(event) {
+        // Get click coordinates relative to canvas
+        const rect = canvas.getBoundingClientRect();
+        const clickX = event.clientX - rect.left;
+        const clickY = event.clientY - rect.top;
+        
+        // Create new cube at click location
+        const newCube = new PhysicalObject(
+            clickX - 10, // Offset by half width to center at click
+            clickY - 10, // Offset by half height to center at click
+            30, // Width
+            30, // Height
+            2,  // Mass
+            false, // Not static
+        );
+        
+        // Add to physics objects
+        physicalObjects.push(newCube);
+    });
 
     // PhysicalObject class
     let PhysicalObject = function(x, y, w, h, mass, isStatic, isPlayer) {
@@ -59,8 +64,6 @@ document.addEventListener("DOMContentLoaded", function() {
         this.height = h;
         this.mass = mass;
         this.isStatic = isStatic;
-        this.isPlayer = isPlayer;
-        this.canJump = false;
         this.isOnGround = false;
 
         this.ax = 0;
@@ -79,7 +82,6 @@ document.addEventListener("DOMContentLoaded", function() {
         // Update object's position based on velocity
         this.update = function() {
             if (!this.isStatic) {
-                this.handleInput();
 
                 let tempX = this.x;
                 let tempY = this.y;
@@ -89,7 +91,7 @@ document.addEventListener("DOMContentLoaded", function() {
                 this.vy = this.y - this.prevY;
 
                 // Apply gravity as a force
-                this.applyForce(0, gravity);
+                this.ay += gravity;
 
                 if (this.isOnGround) {
                     let frictionForce = -this.vx * friction;
@@ -117,39 +119,6 @@ document.addEventListener("DOMContentLoaded", function() {
                    this.y < other.y + other.height &&
                    this.y + this.height > other.y;
         };
-
-        this.handleInput = function() {
-            if (this.isPlayer) {
-                // Move speed
-                const groundSpeed = 1.4;
-                const airSpeed = 0.8;
-                const jumpForce = -12;
-
-                const speed = this.isOnGround ? groundSpeed : airSpeed;
-
-                let FforceX = 0;
-
-                if(keys.ArrowLeft) {
-                    FforceX = -speed;
-                } else if (keys.ArrowRight) {
-                    FforceX = speed;
-                }
-
-                if (!this.isOnGround) {
-                    let airResistance = -this.vx * 0.03;
-                    this.applyForce(airResistance, 0);
-                }
-
-                // Apply friction
-                this.applyForce(FforceX, 0);
-
-                if (keys.ArrowUp && this.canJump) {
-                    this.applyForce(0, jumpForce);
-                    this.canJump = false;
-                    this.isOnGround = false;
-                }
-            }
-        };
     };
 
     // Render each frame
@@ -163,18 +132,16 @@ document.addEventListener("DOMContentLoaded", function() {
             obj.update();
 
             // Draw the object    
-            context.fillStyle = obj.isStatic ? "black" : (obj.isPlayer ? "red" : "blue");
+            context.fillStyle = obj.isStatic ? "black" : "blue";
             context.fillRect(obj.x, obj.y, obj.width, obj.height);
         }
 
+        // Reset isOnGround for all non-static objects
         physicalObjects.forEach(obj => {
             if (!obj.isStatic) {
                 obj.isOnGround = false;
-                if (obj.isPlayer) {
-                    obj.canJump = false;
-                }
             }
-        })
+        });
 
         // Handle collisions
         for (let i = 0; i < physicalObjects.length; i++) {
@@ -189,7 +156,7 @@ document.addEventListener("DOMContentLoaded", function() {
         }
     }
 
-    // Collision response considering mass
+    // Collision response considering mass and direction
     function handleCollision(objA, objB) {
         if (objA.isStatic && objB.isStatic) {
             // Both objects are static; no response needed
@@ -207,7 +174,7 @@ document.addEventListener("DOMContentLoaded", function() {
         // Determine the minimal axis for collision resolution
         if (overlapX < overlapY) {
             let displacement;
-    
+
             if (objA.isStatic && !objB.isStatic) {
                 displacement = overlapX;
                 objB.x += displacement * (objA.x < objB.x ? -1 : 1);
@@ -232,90 +199,35 @@ document.addEventListener("DOMContentLoaded", function() {
             let objects = [objA, objB];
             let dynamicObjects = objects.filter(obj => !obj.isStatic);
 
+            // Determine collision direction based on previous velocities
             dynamicObjects.forEach(obj => {
-                obj.isOnGround = obj.vy >= 0;
-            });
-
-            objects.forEach(obj => {
-                obj.isOnGround = obj.vy >= 0;
-            });
-
-            let player, platform;
-    
-            if (objA.isPlayer) {
-                player = objA;
-                platform = objB;
-            } else if (objB.isPlayer) {
-                player = objB;
-                platform = objA;
-            }
-    
-            if (objA.isPlayer || objB.isPlayer) {
-                // Player-specific collision handling
-                let player = objA.isPlayer ? objA : objB.isPlayer ? objB : null;
-                let platform = objA.isPlayer ? objB : objB.isPlayer ? objA : null;
-    
-                if (player && platform) {
-                    let platformTop = platform.y;
-                    let platformBottom = platform.y + platform.height;
-    
-                    const groundTolerance = 0.1;
-    
-                    let playerPrevY = player.y - player.vy;
-                    let playerPrevBottom = playerPrevY + player.height;
-    
-                    // Check if collision is from the top
-                    if (playerPrevBottom <= platformTop + groundTolerance && player.vy >= 0) {
-                        // Landing on the platform
-                        player.canJump = true;
-                        player.isOnGround = true;
-                        player.vy = 0;
-                        player.y = platformTop - player.height;
-    
-                        if (!platform.isStatic) {
-                            player.vx += platform.vx;
-                        }
-                    } else if (playerPrevY >= platformBottom - groundTolerance && player.vy <= 0) {
-                        // Hitting platform from below
-                        player.vy = 0;
-                        player.y = platform.y + platform.height;
-                        player.isOnGround = false;
-                    } else {
-                        if (player.x + player.width > platform.x && player.vx > 0) {
-                            player.x = platform.x - player.width;
-                        } else if (player.x < platform.x + platform.width && player.vx < 0) {
-                            player.x = platform.x + platform.width;
-                        }
-                    }
+                if (obj.vy >= 0) {
+                    obj.isOnGround = true;
+                    obj.vy = 0;
                 }
+            });
+
+            // Handle collisions on Y axis
+            if (objA.isStatic) {
+                objB.y += overlapY * (objA.y < objB.y ? 1 : -1);
+            } else if (objB.isStatic) {
+                objA.y += overlapY * (objA.y < objB.y ? -1 : 1);
             } else {
-                // Handle non-player collisions on Y axis
-                if (objA.isStatic) {
-                    objB.y += overlapY * (objA.y < objB.y ? 1 : -1);
-                } else if (objB.isStatic) {
-                    objA.y += overlapY * (objA.y < objB.y ? -1 : 1);
-                } else {
-                    objA.y += overlapY / 2 * (objA.y < objB.y ? -1 : 1);
-                    objB.y += overlapY / 2 * (objA.y < objB.y ? 1 : -1);
-                }
-    
-                const bounciness = 0;
-                if (!objA.isStatic && !objB.isStatic) {
-                    let tempVy = objA.vy;
-                    objA.vy = bounciness * (objA.vy * (objA.mass - objB.mass) + 2 * objB.mass * objB.vy) / (objA.mass + objB.mass);
-                    objB.vy = bounciness * (objB.vy * (objB.mass - objA.mass) + 2 * objA.mass * tempVy) / (objA.mass + objB.mass);
-                } else if (objA.isStatic && !objB.isStatic) {
-                    objB.vy = -bounciness * objB.vy;
-                    objB.y = objA.y - objB.height;
-                } else if (!objA.isStatic && objB.isStatic) {
-                    objA.vy = -bounciness * objA.vy;
-                    objA.y = objB.y - objA.height;
-                }
-    
-                if (player) {
-                    player.isOnGround = false;
-                    player.canJump = false;
-                }
+                objA.y += (overlapY / 2) * (objA.y < objB.y ? -1 : 1);
+                objB.y += (overlapY / 2) * (objA.y < objB.y ? 1 : -1);
+            }
+
+            const bounciness = 0;
+            if (!objA.isStatic && !objB.isStatic) {
+                let tempVy = objA.vy;
+                objA.vy = bounciness * (objA.vy * (objA.mass - objB.mass) + 2 * objB.mass * objB.vy) / (objA.mass + objB.mass);
+                objB.vy = bounciness * (objB.vy * (objB.mass - objA.mass) + 2 * objA.mass * tempVy) / (objA.mass + objB.mass);
+            } else if (objA.isStatic && !objB.isStatic) {
+                objB.vy = -bounciness * objB.vy;
+                objB.y = objA.y - objB.height;
+            } else if (!objA.isStatic && objB.isStatic) {
+                objA.vy = -bounciness * objA.vy;
+                objA.y = objB.y - objA.height;
             }
         }
     }
@@ -335,39 +247,38 @@ document.addEventListener("DOMContentLoaded", function() {
     // Initiate new objects into physicalObjects (cubes)
     // x, y, w, h, mass, isStatic, isPlayer
 
-    // Player
-    physicalObjects.push(new PhysicalObject(50, 0, 30, 30, 2, false, true));
+    // Removed player initialization
+    // physicalObjects.push(new PhysicalObject(50, 0, 30, 30, 2, false, true));
 
+    // Initialize dynamic objects within the viewport
 
-    physicalObjects.push(new PhysicalObject(125, 0, 20, 20, 1, false, false));
-    physicalObjects.push(new PhysicalObject(150, 0, 20, 20, 1, false, false));
-    physicalObjects.push(new PhysicalObject(175, 0, 20, 20, 1, false, false));
-
-    physicalObjects.push(new PhysicalObject(145, 20, 20, 20, 1, false, false));
-    physicalObjects.push(new PhysicalObject(170, 20, 20, 20, 1, false, false));
-    physicalObjects.push(new PhysicalObject(195, 20, 20, 20, 1, false, false));
-
-    physicalObjects.push(new PhysicalObject(165, 20, 20, 20, 1, false, false));
-    physicalObjects.push(new PhysicalObject(190, 20, 20, 20, 1, false, false));
-    physicalObjects.push(new PhysicalObject(215, 20, 20, 20, 1, false, false));
+    // Stack of squares to the left
+    physicalObjects.push(new PhysicalObject(125, height - 100, 20, 20, 1, false));
+    physicalObjects.push(new PhysicalObject(150, height - 100, 20, 20, 1, false));
+    physicalObjects.push(new PhysicalObject(175, height - 100, 20, 20, 1, false));
+    physicalObjects.push(new PhysicalObject(125, height - 200, 20, 20, 1, false));
+    physicalObjects.push(new PhysicalObject(150, height - 200, 20, 20, 1, false));
+    physicalObjects.push(new PhysicalObject(175, height - 200, 20, 20, 1, false));
+    physicalObjects.push(new PhysicalObject(125, height - 300, 20, 20, 1, false));
+    physicalObjects.push(new PhysicalObject(150, height - 300, 20, 20, 1, false));
+    physicalObjects.push(new PhysicalObject(175, height - 300, 20, 20, 1, false));
 
     // Stack of rectangles on the right
-    physicalObjects.push(new PhysicalObject(700, 50, 20, 20, 1, false, false));
-    physicalObjects.push(new PhysicalObject(1200, 50, 100, 50, 5, false, false));
-    physicalObjects.push(new PhysicalObject(1205, -50, 90, 50, 5, false, false));
-    physicalObjects.push(new PhysicalObject(1210, -150, 80, 50, 4.5, false, false));
-    physicalObjects.push(new PhysicalObject(1215, -250, 70, 50, 4, false, false));
-    physicalObjects.push(new PhysicalObject(1220, -350, 60, 50, 3.5, false, false));
-    physicalObjects.push(new PhysicalObject(1220, -350, 60, 50, 3.5, false, false));
+    physicalObjects.push(new PhysicalObject(700, height - 150, 20, 20, 1, false));
+    physicalObjects.push(new PhysicalObject(1200, height - 150, 100, 50, 5, false));
+    physicalObjects.push(new PhysicalObject(1205, height - 200, 90, 50, 5, false));
+    physicalObjects.push(new PhysicalObject(1210, height - 250, 80, 50, 4.5, false));
+    physicalObjects.push(new PhysicalObject(1215, height - 300, 70, 50, 4, false));
+    physicalObjects.push(new PhysicalObject(1220, height - 350, 60, 50, 3.5, false));
+    physicalObjects.push(new PhysicalObject(1225, height - 400, 50, 50, 3.5, false));
+    physicalObjects.push(new PhysicalObject(1230, height - 450, 40, 50, 3.5, false));
+    physicalObjects.push(new PhysicalObject(1235, height - 500, 30, 50, 3.5, false));
+    physicalObjects.push(new PhysicalObject(1240, height - 550, 20, 50, 3.5, false));
+    physicalObjects.push(new PhysicalObject(1245, height - 600, 10, 50, 3.5, false));
 
-    physicalObjects.push(new PhysicalObject(210, 70, 50, 50, 2, false, false));
-    physicalObjects.push(new PhysicalObject(750, height - 50, 200, 200, 200, false, false));
-
-
-    // Make a floor
-    physicalObjects.push(new PhysicalObject(0, height - 20, width, 20, 1000, true, false));
-    physicalObjects.push(new PhysicalObject(0, height - 500, 200, 20, 1000, true, false));
-    physicalObjects.push(new PhysicalObject(500, height - 500, 200, 20, 1000, true, false));
-    physicalObjects.push(new PhysicalObject(1000, height - 500, 200, 20, 1000, true, false));
-    physicalObjects.push(new PhysicalObject(750, height - 1000, 200, 20, 1000, true, false));
+    // Platforms
+    physicalObjects.push(new PhysicalObject(0, height - 20, width, 20, 1000, true));
+    physicalObjects.push(new PhysicalObject(0, height - 500, 200, 20, 1000, true));
+    physicalObjects.push(new PhysicalObject(500, height - 500, 200, 20, 1000, true));
+    physicalObjects.push(new PhysicalObject(1000, height - 500, 200, 20, 1000, true));
 });

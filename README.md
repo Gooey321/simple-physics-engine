@@ -3,6 +3,7 @@
 A custom *slightly buggy* physics engine built from scratch for simulating basic physical interactions between objects. Like making a platformer game
 
 ## Features
+### *Warning collisions from underneath 
 
 - Basic collision detection and response
 - Gravity and friction simulation
