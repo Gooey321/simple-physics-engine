@@ -30,12 +30,6 @@ A custom *slightly buggy* physics engine built from scratch for simulating basic
 
 1. Open `index.html` in your web browser to start the simulation.
 
-### Controls
-
-- `ArrowLeft`: Move player left
-- `ArrowRight`: Move player right
-- `ArrowUp`: Jump
-
 ## Code Overview
 
 ### Main Files
